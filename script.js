@@ -37,6 +37,36 @@ document.addEventListener('DOMContentLoaded', function() {
         return Promise.all(loading);
     }
 
+    // Ensure gif.js library is loaded (in case CDN failed or loaded late)
+    function ensureGifLibLoaded() {
+        return new Promise((resolve, reject) => {
+            if (typeof window.GIF !== 'undefined') {
+                return resolve();
+            }
+            // Attempt to dynamically load from CDN
+            const existing = document.querySelector('script[data-dynamic="gif.js"]');
+            if (existing) {
+                existing.addEventListener('load', () => (typeof window.GIF !== 'undefined') ? resolve() : reject(new Error('gif.js failed to load')));
+                existing.addEventListener('error', () => reject(new Error('gif.js script failed to load')));
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.min.js';
+            script.async = true;
+            script.crossOrigin = 'anonymous';
+            script.setAttribute('data-dynamic', 'gif.js');
+            script.addEventListener('load', () => {
+                if (typeof window.GIF !== 'undefined') {
+                    resolve();
+                } else {
+                    reject(new Error('gif.js loaded but GIF is undefined'));
+                }
+            });
+            script.addEventListener('error', () => reject(new Error('gif.js script failed to load')));
+            document.head.appendChild(script);
+        });
+    }
+
     // Calculate a path radius based on rendered medal size
     function getPathRadius() {
         // Use a factor so the path sits nicely inside the medal edge
@@ -86,6 +116,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             await waitForImages();
+            // Make sure the GIF class is available even if the CDN script wasn't ready
+            await ensureGifLibLoaded();
 
             // Prepare offscreen canvas matching the visible container
             const width = medalContainer.offsetWidth;
