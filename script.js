@@ -161,6 +161,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Create a new GIF instance
             const workerBlobUrl = createGifWorkerBlobUrl();
+            try {
+                if (window.GIF && window.GIF.defaults) {
+                    window.GIF.defaults.workerScript = workerBlobUrl;
+                }
+            } catch (_) {}
             const gif = new GIF({
                 workers: 2,
                 quality: 10,
@@ -169,6 +174,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 height,
                 transparent: 0x00FF00 // not critical; helps some viewers
             });
+            try {
+                console.debug('GIF workerScript in options:', gif.options && gif.options.workerScript);
+            } catch (_) {}
 
             // Build frames
             for (let i = 0; i <= totalFrames; i++) {
