@@ -67,6 +67,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Create a same-origin Blob URL that bootstraps the real worker via importScripts.
+    // This avoids cross-origin worker construction errors on hosts like GitHub Pages.
+    function createGifWorkerBlobUrl() {
+        const workerBootstrap = `self.window = self;\ntry {\n  importScripts('https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.min.js');\n} catch (e) {\n  postMessage({ type: 'error', error: 'Failed to load gif.worker: ' + e.message });\n}`;
+        const blob = new Blob([workerBootstrap], { type: 'application/javascript' });
+        return URL.createObjectURL(blob);
+    }
+
     // Calculate a path radius based on rendered medal size
     function getPathRadius() {
         // Use a factor so the path sits nicely inside the medal edge
@@ -152,10 +160,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Create a new GIF instance
+            const workerBlobUrl = createGifWorkerBlobUrl();
             const gif = new GIF({
                 workers: 2,
                 quality: 10,
-                workerScript: 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.min.js',
+                workerScript: workerBlobUrl,
                 width,
                 height,
                 transparent: 0x00FF00 // not critical; helps some viewers
@@ -191,6 +200,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 generateBtn.disabled = false;
                 generateBtn.textContent = 'Generate Progress GIF';
+                // Cleanup worker blob URL
+                try { URL.revokeObjectURL(gif.options.workerScript); } catch (_) {}
             });
 
             // Render GIF
