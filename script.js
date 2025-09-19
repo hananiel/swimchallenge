@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.min.js';
+            script.src = 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.min.js';
             script.async = true;
             script.crossOrigin = 'anonymous';
             script.setAttribute('data-dynamic', 'gif.js');
@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const gif = new GIF({
                 workers: 2,
                 quality: 10,
-                workerScript: 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.min.js',
+                workerScript: 'https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.min.js',
                 width,
                 height,
                 transparent: 0x00FF00 // not critical; helps some viewers
