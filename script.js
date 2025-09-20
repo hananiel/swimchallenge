@@ -11,6 +11,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const gifOutput = document.getElementById('gifOutput');
     const downloadLink = document.getElementById('downloadGif');
     
+    // Path keyframes provided by user for swimmer center position (x,y) by progress t
+    const PATH_KEYFRAMES = [
+        { t: 0.00, x: 102, y: 345 },
+        { t: 0.25, x: 167, y: 352 },
+        { t: 0.50, x: 233, y: 388 },
+        { t: 0.75, x: 294, y: 379 },
+        { t: 1.00, x: 344, y: 367 }
+    ];
+    // The swimmer's visual center offset (provided): center is at (54, 24) from the image's top-left
+    const SWIMMER_CENTER_OFFSET = { x: 54, y: 24 };
+    // Overlay elements for percentage (bottom-right) and yards (bottom-left)
+    let overlayPctEl, overlayYardsEl;
+    
     // Fixed goal yards
     targetYardsSpan.textContent = GOAL_YARDS;
     
@@ -35,6 +48,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 img.addEventListener('error', () => resolve(), { once: true });
             }));
         return Promise.all(loading);
+    }
+
+    function ensureOverlays() {
+        if (!overlayPctEl) {
+            overlayPctEl = document.createElement('div');
+            overlayPctEl.style.position = 'absolute';
+            overlayPctEl.style.right = '10px';
+            overlayPctEl.style.bottom = '8px';
+            overlayPctEl.style.color = '#ffffff';
+            overlayPctEl.style.font = '700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+            overlayPctEl.style.textShadow = '0 1px 2px rgba(0,0,0,0.7)';
+            overlayPctEl.style.pointerEvents = 'none';
+            medalContainer.appendChild(overlayPctEl);
+        }
+        if (!overlayYardsEl) {
+            overlayYardsEl = document.createElement('div');
+            overlayYardsEl.style.position = 'absolute';
+            overlayYardsEl.style.left = '10px';
+            overlayYardsEl.style.bottom = '8px';
+            overlayYardsEl.style.color = '#ffffff';
+            overlayYardsEl.style.font = '600 16px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+            overlayYardsEl.style.textShadow = '0 1px 2px rgba(0,0,0,0.7)';
+            overlayYardsEl.style.pointerEvents = 'none';
+            medalContainer.appendChild(overlayYardsEl);
+        }
     }
 
     // Ensure gif.js library is loaded (in case CDN failed or loaded late)
@@ -75,37 +113,45 @@ document.addEventListener('DOMContentLoaded', function() {
         return URL.createObjectURL(blob);
     }
 
-    // Calculate a path radius based on rendered medal size
-    function getPathRadius() {
-        // Use a factor so the path sits nicely inside the medal edge
-        const radiusFactor = 0.38; // tweak as needed for your artwork
-        const w = medalContainer.clientWidth || 300;
-        const h = medalContainer.clientHeight || 300;
-        const radius = Math.min(w, h) * radiusFactor;
-        return radius;
+    // Interpolate along provided keyframes for a given progress 0..1 to get center (x,y)
+    function getPositionForProgress(t) {
+        const clamped = Math.max(0, Math.min(1, t));
+        // Find segment
+        let i = 0;
+        for (; i < PATH_KEYFRAMES.length - 1; i++) {
+            const a = PATH_KEYFRAMES[i];
+            const b = PATH_KEYFRAMES[i + 1];
+            if (clamped >= a.t && clamped <= b.t) {
+                const span = (b.t - a.t) || 1;
+                const local = (clamped - a.t) / span;
+                const x = a.x + (b.x - a.x) * local;
+                const y = a.y + (b.y - a.y) * local;
+                return { x, y };
+            }
+        }
+        // Fallback to last point
+        const last = PATH_KEYFRAMES[PATH_KEYFRAMES.length - 1];
+        return { x: last.x, y: last.y };
     }
     
     // Function to update the progress visualization
     function updateProgress(current, total) {
+        ensureOverlays();
         const progress = Math.min(current / total, 1);
-        const angle = progress * 360;
-        const radius = getPathRadius(); // Radius of the medal path
-        const centerX = medalContainer.offsetWidth / 2;
-        const centerY = medalContainer.offsetHeight / 2;
-        
-        // Calculate position on the circular path
-        const radian = (angle - 90) * (Math.PI / 180);
-        const x = centerX + (radius * Math.cos(radian));
-        const y = centerY + (radius * Math.sin(radian));
-        
-        // Update swimmer position
-        swimmer.style.left = `${x}px`;
-        swimmer.style.top = `${y}px`;
-        
+        const { x, y } = getPositionForProgress(progress);
+
+        // Update swimmer position (convert center->top-left using provided offsets)
+        swimmer.style.left = `${Math.round(x - SWIMMER_CENTER_OFFSET.x)}px`;
+        swimmer.style.top = `${Math.round(y - SWIMMER_CENTER_OFFSET.y)}px`;
+
         // Update progress bar
         const progressPercent = Math.round(progress * 100);
         progressBar.style.width = `${progressPercent}%`;
         currentYardsSpan.textContent = Math.round(current);
+
+        // Update overlays text
+        overlayPctEl.textContent = `${progressPercent}%`;
+        overlayYardsEl.textContent = `${Math.round(current)} / ${GOAL_YARDS} yards`;
         
         return { x, y };
     }
@@ -142,21 +188,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Draw medal stretched to container (simple and robust)
                 ctx.drawImage(medal, 0, 0, width, height);
 
-                // Compute swimmer position
+                // Compute swimmer position via keyframe interpolation
                 const progress = Math.min(atYards / GOAL_YARDS, 1);
-                const angle = progress * 360;
-                const radius = getPathRadius();
-                const centerX = width / 2;
-                const centerY = height / 2;
-                const radian = (angle - 90) * (Math.PI / 180);
-                const x = centerX + (radius * Math.cos(radian));
-                const y = centerY + (radius * Math.sin(radian));
+                const pos = getPositionForProgress(progress);
 
-                // Draw swimmer centered at (x,y) with width ~ CSS width (60px)
-                const targetW = 60;
-                const aspect = swimmer.naturalHeight / swimmer.naturalWidth;
-                const targetH = Math.max(1, targetW * aspect);
-                ctx.drawImage(swimmer, Math.round(x - targetW / 2), Math.round(y - targetH / 2), targetW, targetH);
+                // Draw swimmer using provided center offset
+                const drawX = Math.round(pos.x - SWIMMER_CENTER_OFFSET.x);
+                const drawY = Math.round(pos.y - SWIMMER_CENTER_OFFSET.y);
+                const targetW = swimmer.naturalWidth; // draw at natural size for fidelity
+                const targetH = swimmer.naturalHeight;
+                ctx.drawImage(swimmer, drawX, drawY, targetW, targetH);
+
+                // Overlays: left yards and bottom-right percentage
+                const pctText = `${Math.round(progress * 100)}%`;
+                const yardsText = `${Math.round(atYards)} / ${GOAL_YARDS} yards`;
+                ctx.save();
+                ctx.font = '700 20px Segoe UI, system-ui, Arial';
+                ctx.textBaseline = 'bottom';
+                ctx.shadowColor = 'rgba(0,0,0,0.7)';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetY = 1;
+                ctx.fillStyle = '#ffffff';
+                // Left-bottom yards
+                ctx.fillText(yardsText, 10, height - 8);
+                // Right-bottom percentage
+                const pctWidth = ctx.measureText(pctText).width;
+                ctx.fillText(pctText, width - 10 - pctWidth, height - 8);
+                ctx.restore();
             }
 
             // Create a new GIF instance
