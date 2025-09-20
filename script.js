@@ -15,6 +15,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const MEDAL_NATURAL_W = 483;
     const MEDAL_NATURAL_H = 586;
     
+    // Runtime-selected chroma key for GIF transparency handling
+    let CHROMA_KEY = null; // { css: '#ff00ff', int: 0xff00ff }
+    
     // Path keyframes provided by user for swimmer center position (x,y) by progress t
     const PATH_KEYFRAMES = [
         { t: 0.00, x: 102, y: 345 },
@@ -52,6 +55,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 img.addEventListener('error', () => resolve(), { once: true });
             }));
         return Promise.all(loading);
+    }
+
+    // Scan an image for exact RGB matches
+    function imageContainsColor(img, rgb) {
+        try {
+            const c = document.createElement('canvas');
+            c.width = img.naturalWidth;
+            c.height = img.naturalHeight;
+            const ctx2 = c.getContext('2d');
+            ctx2.drawImage(img, 0, 0);
+            const data = ctx2.getImageData(0, 0, c.width, c.height).data;
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i] === rgb.r && data[i + 1] === rgb.g && data[i + 2] === rgb.b) {
+                    return true;
+                }
+            }
+        } catch (_) {
+            // If tainted, assume color absent to avoid false positives
+            return false;
+        }
+        return false;
+    }
+
+    function hexToRgb(hex) {
+        const v = hex.startsWith('#') ? hex.slice(1) : hex;
+        const int = parseInt(v, 16);
+        return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 };
+    }
+
+    function rgbToInt(rgb) {
+        return (rgb.r << 16) | (rgb.g << 8) | rgb.b;
+    }
+
+    // Pick a chroma key color not present in medal or swimmer
+    function pickUnusedChromaKey() {
+        if (CHROMA_KEY) return CHROMA_KEY;
+        const candidates = ['#ff00ff', '#00ff00', '#00ffff', '#ff9900'];
+        for (const css of candidates) {
+            const rgb = hexToRgb(css);
+            const medalHas = imageContainsColor(medal, rgb);
+            const swimmerHas = imageContainsColor(swimmer, rgb);
+            if (!medalHas && !swimmerHas) {
+                CHROMA_KEY = { css, int: rgbToInt(rgb) };
+                break;
+            }
+        }
+        // Fallback if all found (unlikely): use magenta
+        if (!CHROMA_KEY) {
+            const rgb = hexToRgb('#ff00ff');
+            CHROMA_KEY = { css: '#ff00ff', int: rgbToInt(rgb) };
+        }
+        return CHROMA_KEY;
     }
 
     function ensureOverlays() {
@@ -176,6 +231,8 @@ document.addEventListener('DOMContentLoaded', function() {
             await waitForImages();
             // Make sure the GIF class is available even if the CDN script wasn't ready
             await ensureGifLibLoaded();
+            // Choose a chroma key that does not appear in the images
+            pickUnusedChromaKey();
 
             // Prepare offscreen canvas at fixed natural medal dimensions to avoid any aspect distortion
             const width = MEDAL_NATURAL_W;
@@ -189,9 +246,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Helper to draw a single frame at given yards
             function drawFrame(atYards) {
-                // Clear with transparent (keep alpha so outside medal remains transparent)
-                ctx.clearRect(0, 0, width, height);
-                // Draw medal at fixed natural size so background is identical each frame
+                // Fill with chroma key so encoder can map it to transparent
+                ctx.fillStyle = CHROMA_KEY.css;
+                ctx.fillRect(0, 0, width, height);
+                // Draw medal at fixed natural size so background is identical each frame (over chroma fill)
                 ctx.drawImage(medal, 0, 0, MEDAL_NATURAL_W, MEDAL_NATURAL_H);
 
                 // Compute swimmer position via keyframe interpolation
@@ -237,8 +295,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 workerScript: workerBlobUrl,
                 width,
                 height,
-                // Use a dedicated transparent color index; fully transparent pixels will map to this
-                transparent: 0x00FF00,
+                // Ensure the encoder maps chroma key to transparent
+                background: CHROMA_KEY.css,
+                transparent: CHROMA_KEY.int,
                 repeat: 0 // loop forever
             });
             try {
