@@ -246,10 +246,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Helper to draw a single frame at given yards
             function drawFrame(atYards) {
-                // Fill with chroma key so encoder can map it to transparent
-                ctx.fillStyle = CHROMA_KEY.css;
+                // Use solid white matte to avoid magenta fringe and ensure consistent background
+                ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, width, height);
-                // Draw medal at fixed natural size so background is identical each frame (over chroma fill)
+                // Draw medal at fixed natural size so background is identical each frame (over white)
                 ctx.drawImage(medal, 0, 0, MEDAL_NATURAL_W, MEDAL_NATURAL_H);
 
                 // Compute swimmer position via keyframe interpolation
@@ -269,11 +269,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 ctx.save();
                 ctx.font = '700 20px Segoe UI, system-ui, Arial';
                 ctx.textBaseline = 'bottom';
-                // Keep shadows subtle and integer-aligned to minimize flicker
-                ctx.shadowColor = 'rgba(0,0,0,0.6)';
-                ctx.shadowBlur = 3;
-                ctx.shadowOffsetY = 1;
-                ctx.fillStyle = '#ffffff';
+                // No shadows to prevent color bleed in GIF palette
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.fillStyle = '#000000';
                 // Left-bottom yards
                 ctx.fillText(yardsText, 10, height - 8);
                 // Right-bottom percentage
@@ -295,9 +295,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 workerScript: workerBlobUrl,
                 width,
                 height,
-                // Ensure the encoder maps chroma key to transparent
-                background: CHROMA_KEY.css,
-                transparent: CHROMA_KEY.int,
+                // Opaque white background to eliminate pink fringe
+                background: '#ffffff',
                 repeat: 0 // loop forever
             });
             try {
