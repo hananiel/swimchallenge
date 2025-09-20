@@ -11,6 +11,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const gifOutput = document.getElementById('gifOutput');
     const downloadLink = document.getElementById('downloadGif');
     
+    // Fixed, natural medal dimensions to ensure correct GIF aspect (provided)
+    const MEDAL_NATURAL_W = 483;
+    const MEDAL_NATURAL_H = 586;
+    
     // Path keyframes provided by user for swimmer center position (x,y) by progress t
     const PATH_KEYFRAMES = [
         { t: 0.00, x: 102, y: 345 },
@@ -173,20 +177,22 @@ document.addEventListener('DOMContentLoaded', function() {
             // Make sure the GIF class is available even if the CDN script wasn't ready
             await ensureGifLibLoaded();
 
-            // Prepare offscreen canvas matching the visible container
-            const width = medalContainer.offsetWidth;
-            const height = medalContainer.offsetHeight;
+            // Prepare offscreen canvas at fixed natural medal dimensions to avoid any aspect distortion
+            const width = MEDAL_NATURAL_W;
+            const height = MEDAL_NATURAL_H;
             const offscreen = document.createElement('canvas');
             offscreen.width = width;
             offscreen.height = height;
             const ctx = offscreen.getContext('2d');
+            // Avoid sub-pixel smoothing differences frame-to-frame
+            ctx.imageSmoothingEnabled = true;
 
             // Helper to draw a single frame at given yards
             function drawFrame(atYards) {
                 // Clear with transparent
                 ctx.clearRect(0, 0, width, height);
-                // Draw medal stretched to container (simple and robust)
-                ctx.drawImage(medal, 0, 0, width, height);
+                // Draw medal at fixed natural size so background is identical each frame
+                ctx.drawImage(medal, 0, 0, MEDAL_NATURAL_W, MEDAL_NATURAL_H);
 
                 // Compute swimmer position via keyframe interpolation
                 const progress = Math.min(atYards / GOAL_YARDS, 1);
@@ -195,9 +201,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Draw swimmer using provided center offset
                 const drawX = Math.round(pos.x - SWIMMER_CENTER_OFFSET.x);
                 const drawY = Math.round(pos.y - SWIMMER_CENTER_OFFSET.y);
-                const targetW = swimmer.naturalWidth; // draw at natural size for fidelity
-                const targetH = swimmer.naturalHeight;
-                ctx.drawImage(swimmer, drawX, drawY, targetW, targetH);
+                const targetW = Math.round(swimmer.naturalWidth || 94);
+                const targetH = Math.round(swimmer.naturalHeight || 62);
+                ctx.drawImage(swimmer, Math.round(drawX), Math.round(drawY), targetW, targetH);
 
                 // Overlays: left yards and bottom-right percentage
                 const pctText = `${Math.round(progress * 100)}%`;
@@ -205,15 +211,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 ctx.save();
                 ctx.font = '700 20px Segoe UI, system-ui, Arial';
                 ctx.textBaseline = 'bottom';
-                ctx.shadowColor = 'rgba(0,0,0,0.7)';
-                ctx.shadowBlur = 4;
+                // Keep shadows subtle and integer-aligned to minimize flicker
+                ctx.shadowColor = 'rgba(0,0,0,0.6)';
+                ctx.shadowBlur = 3;
                 ctx.shadowOffsetY = 1;
                 ctx.fillStyle = '#ffffff';
                 // Left-bottom yards
                 ctx.fillText(yardsText, 10, height - 8);
                 // Right-bottom percentage
                 const pctWidth = ctx.measureText(pctText).width;
-                ctx.fillText(pctText, width - 10 - pctWidth, height - 8);
+                ctx.fillText(pctText, Math.round(width - 10 - pctWidth), height - 8);
                 ctx.restore();
             }
 
@@ -230,7 +237,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 workerScript: workerBlobUrl,
                 width,
                 height,
-                transparent: 0x00FF00 // not critical; helps some viewers
+                // Avoid using a transparent key color to reduce artifacts/noise
+                // transparent: null,
+                repeat: 0 // loop forever
             });
             try {
                 console.debug('GIF workerScript in options:', gif.options && gif.options.workerScript);
@@ -241,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const progress = i / totalFrames;
                 const atYards = Math.round(progress * completedYards);
                 drawFrame(atYards);
-                gif.addFrame(offscreen, { delay: 50, copy: true });
+                gif.addFrame(offscreen, { delay: i === totalFrames ? 3000 : 50, copy: true, dispose: 2 });
 
                 const pct = Math.round((i / totalFrames) * 100);
                 generateBtn.innerHTML = `Generating... ${pct}%`;
