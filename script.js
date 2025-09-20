@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Helper to draw a single frame at given yards
             function drawFrame(atYards) {
-                // Clear with transparent
+                // Clear with transparent (keep alpha so outside medal remains transparent)
                 ctx.clearRect(0, 0, width, height);
                 // Draw medal at fixed natural size so background is identical each frame
                 ctx.drawImage(medal, 0, 0, MEDAL_NATURAL_W, MEDAL_NATURAL_H);
@@ -237,8 +237,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 workerScript: workerBlobUrl,
                 width,
                 height,
-                // Avoid using a transparent key color to reduce artifacts/noise
-                // transparent: null,
+                // Use a dedicated transparent color index; fully transparent pixels will map to this
+                transparent: 0x00FF00,
                 repeat: 0 // loop forever
             });
             try {
