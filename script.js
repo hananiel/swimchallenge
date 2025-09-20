@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const targetYardsSpan = document.getElementById('targetYards');
     const gifOutput = document.getElementById('gifOutput');
     const downloadLink = document.getElementById('downloadGif');
+    const exportVideoBtn = document.getElementById('exportVideoBtn');
+    const downloadVideo = document.getElementById('downloadVideo');
     
     // Fixed, natural medal dimensions to ensure correct GIF aspect (provided)
     const MEDAL_NATURAL_W = 483;
@@ -44,6 +46,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Generate GIF button click handler
     generateBtn.addEventListener('click', generateProgressGif);
+    // Export video button click handler
+    if (exportVideoBtn) exportVideoBtn.addEventListener('click', exportProgressVideo);
 
     // Ensure images are loaded before we measure sizes/positions
     function waitForImages() {
@@ -55,6 +59,123 @@ document.addEventListener('DOMContentLoaded', function() {
                 img.addEventListener('error', () => resolve(), { once: true });
             }));
         return Promise.all(loading);
+    }
+    
+    // Function to export a WebM video using MediaRecorder
+    async function exportProgressVideo() {
+        let completedYards = parseInt(completedYardsInput.value) || 0;
+        completedYards = Math.max(0, Math.min(GOAL_YARDS, completedYards));
+        const totalFrames = 40; // keep in sync with GIF
+        const fps = 20; // 50ms per frame
+
+        if (!exportVideoBtn || !downloadVideo) return;
+
+        // Show loading state
+        exportVideoBtn.disabled = true;
+        const originalBtnText = exportVideoBtn.textContent;
+        exportVideoBtn.innerHTML = 'Exporting... <span class="loading"></span>';
+        gifOutput.innerHTML = '';
+        downloadVideo.style.display = 'none';
+
+        try {
+            await waitForImages();
+
+            // Prepare offscreen canvas at fixed natural medal dimensions
+            const width = MEDAL_NATURAL_W;
+            const height = MEDAL_NATURAL_H;
+            const offscreen = document.createElement('canvas');
+            offscreen.width = width;
+            offscreen.height = height;
+            const ctx = offscreen.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+
+            // Frame drawer mirrors the GIF one (white background + overlays)
+            function drawFrame(atYards) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(medal, 0, 0, MEDAL_NATURAL_W, MEDAL_NATURAL_H);
+
+                const progress = Math.min(atYards / GOAL_YARDS, 1);
+                const pos = getPositionForProgress(progress);
+                const drawX = Math.round(pos.x - SWIMMER_CENTER_OFFSET.x);
+                const drawY = Math.round(pos.y - SWIMMER_CENTER_OFFSET.y);
+                const targetW = Math.round(swimmer.naturalWidth || 94);
+                const targetH = Math.round(swimmer.naturalHeight || 62);
+                ctx.drawImage(swimmer, Math.round(drawX), Math.round(drawY), targetW, targetH);
+
+                const pctText = `${Math.round(progress * 100)}%`;
+                const yardsText = `${Math.round(atYards)} / ${GOAL_YARDS} yards`;
+                ctx.save();
+                ctx.font = '700 20px Segoe UI, system-ui, Arial';
+                ctx.textBaseline = 'bottom';
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.fillStyle = '#000000';
+                ctx.fillText(yardsText, 10, height - 8);
+                const pctWidth = ctx.measureText(pctText).width;
+                ctx.fillText(pctText, Math.round(width - 10 - pctWidth), height - 8);
+                ctx.restore();
+            }
+
+            // Record the canvas
+            const stream = offscreen.captureStream(fps);
+            const mimeCandidates = [
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8',
+                'video/webm'
+            ];
+            let mimeType = '';
+            for (const m of mimeCandidates) {
+                if (MediaRecorder.isTypeSupported(m)) { mimeType = m; break; }
+            }
+            const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+            const chunks = [];
+            recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+
+            const recordingDone = new Promise((resolve) => {
+                recorder.onstop = () => resolve();
+            });
+
+            recorder.start();
+
+            // Draw frames at the desired timing
+            for (let i = 0; i <= totalFrames; i++) {
+                const progress = i / totalFrames;
+                const atYards = Math.round(progress * completedYards);
+                drawFrame(atYards);
+                await new Promise(r => setTimeout(r, 1000 / fps));
+            }
+            // Pause on last frame for 3 seconds
+            await new Promise(r => setTimeout(r, 3000));
+
+            recorder.stop();
+            await recordingDone;
+
+            const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+            const url = URL.createObjectURL(blob);
+
+            // Preview video element
+            const videoEl = document.createElement('video');
+            videoEl.controls = true;
+            videoEl.loop = true;
+            videoEl.style.maxWidth = '100%';
+            videoEl.src = url;
+            gifOutput.innerHTML = '';
+            gifOutput.appendChild(videoEl);
+
+            // Download link
+            downloadVideo.href = url;
+            downloadVideo.download = `swim-progress-${completedYards}-of-${GOAL_YARDS}yds.webm`;
+            downloadVideo.style.display = 'inline-block';
+
+        } catch (err) {
+            console.error('Error exporting video:', err);
+            gifOutput.innerHTML = '<p style="color: red;">Could not export video in this environment.</p>';
+        } finally {
+            exportVideoBtn.disabled = false;
+            exportVideoBtn.textContent = originalBtnText || 'Export Video (WebM)';
+        }
     }
 
     // Scan an image for exact RGB matches
