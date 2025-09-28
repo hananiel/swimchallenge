@@ -15,13 +15,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const shareGifBtn = document.getElementById('shareGifBtn');
     const shareVideoBtn = document.getElementById('shareVideoBtn');
     
-    // Fixed, natural medal dimensions to ensure correct GIF aspect (provided)
-    const MEDAL_NATURAL_W = 483;
-    const MEDAL_NATURAL_H = 586;
-    
-    // Runtime-selected chroma key for GIF transparency handling
-    let CHROMA_KEY = null; // { css: '#ff00ff', int: 0xff00ff }
-    
     // Path keyframes provided by user for swimmer center position (x,y) by progress t
     const PATH_KEYFRAMES = [
         { t: 0.00, x: 102, y: 345 },
@@ -50,126 +43,135 @@ document.addEventListener('DOMContentLoaded', function() {
     generateBtn.addEventListener('click', generateProgressGif);
     // Export video button click handler
     if (exportVideoBtn) exportVideoBtn.addEventListener('click', exportProgressVideo);
-    // Share GIF button click handler
-    if (shareGifBtn) shareGifBtn.addEventListener('click', shareGifToFacebook);
-    // Share video button click handler
-    if (shareVideoBtn) shareVideoBtn.addEventListener('click', shareVideoToFacebook);
+    // Save GIF to camera roll button click handler
+    if (downloadLink) downloadLink.addEventListener('click', saveGifToCameraRoll);
+    // Save video to camera roll button click handler
+    if (downloadVideo) downloadVideo.addEventListener('click', saveVideoToCameraRoll);
+    // Copy GIF link button click handler
+    if (shareGifBtn) shareGifBtn.addEventListener('click', copyGifLink);
+    // Copy video link button click handler
+    if (shareVideoBtn) shareVideoBtn.addEventListener('click', copyVideoLink);
 
-    // Initialize Facebook SDK for sharing
-    function initFacebookSDK() {
-        return new Promise((resolve, reject) => {
-            // Check if already initialized
-            if (window.FB) {
-                resolve();
-                return;
-            }
-
-            // Load Facebook SDK
-            const script = document.createElement('script');
-            script.src = 'https://connect.facebook.net/en_US/sdk.js';
-            script.async = true;
-            script.defer = true;
-            script.onload = () => {
-                window.fbAsyncInit = function() {
-                    FB.init({
-                        appId: null, // No app ID needed for basic sharing
-                        version: 'v18.0'
-                    });
-                    resolve();
-                };
-            };
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-    }
-
-    // Share file using Web Share API or fallback to Facebook
-    async function shareToFacebook(file, filename, customMessage = '') {
-        const defaultMessage = `Check out my swim progress! 🏊‍♀️ I've completed ${filename.includes('of-') ? filename.split('of-')[0].split('-')[2] : 'some'} yards toward my goal!`;
-
-        // Try Web Share API first (works on mobile and modern browsers)
-        if (navigator.share && navigator.canShare({ files: [file] })) {
-            try {
-                await navigator.share({
-                    title: 'My Swim Progress',
-                    text: customMessage || defaultMessage,
-                    files: [file]
-                });
-                return true;
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    console.log('Web Share API failed:', err);
-                }
-            }
-        }
-
-        // Fallback to Facebook Share Dialog
-        try {
-            await initFacebookSDK();
-
-            // Create object URL for the file
-            const fileUrl = URL.createObjectURL(file);
-
-            // Use Facebook UI dialog for sharing
-            FB.ui({
-                method: 'share',
-                href: fileUrl,
-                quote: customMessage || defaultMessage,
-            }, function(response) {
-                // Clean up the object URL
-                URL.revokeObjectURL(fileUrl);
-
-                if (response && !response.error_code) {
-                    console.log('Shared to Facebook successfully');
-                } else {
-                    console.log('Facebook sharing cancelled or failed');
-                }
-            });
-
-            return true;
-        } catch (error) {
-            console.error('Facebook sharing failed:', error);
-            return false;
-        }
-    }
-
-    // Share GIF to Facebook
-    async function shareGifToFacebook() {
+    // Save to camera roll (iOS optimized)
+    function saveGifToCameraRoll() {
         if (!downloadLink.href) return;
 
-        try {
-            // Fetch the blob from the object URL
-            const response = await fetch(downloadLink.href);
-            const blob = await response.blob();
-            const file = new File([blob], downloadLink.download, { type: 'image/gif' });
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-            const yardsCompleted = completedYardsInput.value || '0';
-            const customMessage = `Just tracked my swim progress - ${yardsCompleted} yards completed! 🏊‍♀️ Who's joining me in the pool?`;
-
-            await shareToFacebook(file, downloadLink.download, customMessage);
-        } catch (error) {
-            console.error('Error sharing GIF:', error);
-            alert('Failed to share GIF. You can still download it and share manually.');
+        if (isIOS && isSafari) {
+            // iOS Safari - use download attribute which offers camera roll saving
+            const link = document.createElement('a');
+            link.href = downloadLink.href;
+            link.download = downloadLink.download;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            // Other browsers - trigger normal download
+            downloadLink.click();
         }
     }
 
-    // Share video to Facebook
-    async function shareVideoToFacebook() {
+    function saveVideoToCameraRoll() {
         if (!downloadVideo.href) return;
 
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+        if (isIOS && isSafari) {
+            // iOS Safari - use download attribute which offers camera roll saving
+            const link = document.createElement('a');
+            link.href = downloadVideo.href;
+            link.download = downloadVideo.download;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            // Other browsers - trigger normal download
+            downloadVideo.click();
+        }
+    // Copy link to clipboard for sharing (with iOS compatibility)
+    async function copyGifLink() {
+        if (!downloadLink.href) return;
+
+        // Check if this is iOS and show warning about blob URL limitations
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+            alert('Note: Blob URLs only work while this page is open. For permanent sharing, consider downloading the GIF and uploading it directly to Facebook.');
+        }
+
         try {
-            // Fetch the blob from the object URL
-            const response = await fetch(downloadVideo.href);
-            const blob = await response.blob();
-            const file = new File([blob], downloadVideo.download, { type: 'video/webm' });
+            // Try modern clipboard API first
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(downloadLink.href);
+            } else {
+                // Fallback for older browsers/iOS
+                const textArea = document.createElement('textarea');
+                textArea.value = downloadLink.href;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
 
-            const yardsCompleted = completedYardsInput.value || '0';
-            const customMessage = `Swim progress update! 🎉 Just completed ${yardsCompleted} yards - feeling accomplished! Who's up for a swim session?`;
-
-            await shareToFacebook(file, downloadVideo.download, customMessage);
+            // Show temporary success feedback
+            const originalText = shareGifBtn.textContent;
+            shareGifBtn.textContent = 'Link Copied!';
+            shareGifBtn.style.backgroundColor = '#4CAF50';
+            setTimeout(() => {
+                shareGifBtn.textContent = originalText;
+                shareGifBtn.style.backgroundColor = '';
+            }, 2000);
         } catch (error) {
-            console.error('Error sharing video:', error);
-            alert('Failed to share video. You can still download it and share manually.');
+            console.error('Failed to copy GIF link:', error);
+            // Show the URL so user can copy manually
+            alert('Copy this link manually: ' + downloadLink.href);
+        }
+    }
+
+    // Copy video link to clipboard for sharing (with iOS compatibility)
+    async function copyVideoLink() {
+        if (!downloadVideo.href) return;
+
+        // Check if this is iOS and show warning about blob URL limitations
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+            alert('Note: Blob URLs only work while this page is open. For permanent sharing, consider downloading the video and uploading it directly to Facebook.');
+        }
+
+        try {
+            // Try modern clipboard API first
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(downloadVideo.href);
+            } else {
+                // Fallback for older browsers/iOS
+                const textArea = document.createElement('textarea');
+                textArea.value = downloadVideo.href;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+
+            // Show temporary success feedback
+            const originalText = shareVideoBtn.textContent;
+            shareVideoBtn.textContent = 'Link Copied!';
+            shareVideoBtn.style.backgroundColor = '#4CAF50';
+            setTimeout(() => {
+                shareVideoBtn.textContent = originalText;
+                shareVideoBtn.style.backgroundColor = '';
+            }, 2000);
+        } catch (error) {
+            console.error('Failed to copy video link:', error);
+            // Show the URL so user can copy manually
+            alert('Copy this link manually: ' + downloadVideo.href);
         }
     }
     function waitForImages() {
