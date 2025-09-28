@@ -14,13 +14,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const downloadVideo = document.getElementById('downloadVideo');
     const shareGifBtn = document.getElementById('shareGifBtn');
     const shareVideoBtn = document.getElementById('shareVideoBtn');
-    
-    // Fixed, natural medal dimensions to ensure correct GIF aspect (provided)
-    const MEDAL_NATURAL_W = 483;
-    const MEDAL_NATURAL_H = 586;
-    
-    // Runtime-selected chroma key for GIF transparency handling
-    let CHROMA_KEY = null; // { css: '#ff00ff', int: 0xff00ff }
     const PATH_KEYFRAMES = [
         { t: 0.00, x: 102, y: 345 },
         { t: 0.25, x: 167, y: 352 },
@@ -48,143 +41,11 @@ document.addEventListener('DOMContentLoaded', function() {
     generateBtn.addEventListener('click', generateProgressGif);
     // Export video button click handler
     if (exportVideoBtn) exportVideoBtn.addEventListener('click', exportProgressVideo);
-    // Save GIF to camera roll button click handler
-    if (downloadLink) downloadLink.addEventListener('click', saveGifToCameraRoll);
-    // Save video to camera roll button click handler
-    if (downloadVideo) downloadVideo.addEventListener('click', saveVideoToCameraRoll);
-    // Copy GIF link button click handler
-    if (shareGifBtn) shareGifBtn.addEventListener('click', copyGifLink);
-    // Copy video link button click handler
-    if (shareVideoBtn) shareVideoBtn.addEventListener('click', copyVideoLink);
+    // Save GIF to default location
+    if (downloadLink) downloadLink.addEventListener('click', () => downloadLink.click());
+    // Save video to default location
+    if (downloadVideo) downloadVideo.addEventListener('click', () => downloadVideo.click());
 
-    // Save to camera roll (iOS optimized) or download for other platforms
-    function saveGifToCameraRoll() {
-        if (!downloadLink.href) return;
-
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-        if (isIOS && isSafari) {
-            // iOS Safari - update button text and use download attribute
-            downloadLink.textContent = 'Save GIF to Camera Roll';
-            const link = document.createElement('a');
-            link.href = downloadLink.href;
-            link.download = downloadLink.download;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } else {
-            // Other platforms - update button text and trigger download
-            downloadLink.textContent = 'Download GIF';
-            downloadLink.click();
-        }
-    }
-
-    function saveVideoToCameraRoll() {
-        if (!downloadVideo.href) return;
-
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-        if (isIOS && isSafari) {
-            // iOS Safari - update button text and use download attribute
-            downloadVideo.textContent = 'Save Video to Camera Roll';
-            const link = document.createElement('a');
-            link.href = downloadVideo.href;
-            link.download = downloadVideo.download;
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } else {
-            // Other platforms - update button text and trigger download
-            downloadVideo.textContent = 'Download Video';
-            downloadVideo.click();
-        }
-    }
-
-    // Copy link to clipboard for sharing (with iOS compatibility)
-    async function copyGifLink() {
-        if (!downloadLink.href) return;
-
-        // Check if this is iOS and show warning about blob URL limitations
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        if (isIOS) {
-            alert('Note: Blob URLs only work while this page is open. For permanent sharing, consider downloading the GIF and uploading it directly to Facebook.');
-        }
-
-        try {
-            // Try modern clipboard API first
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(downloadLink.href);
-            } else {
-                // Fallback for older browsers/iOS
-                const textArea = document.createElement('textarea');
-                textArea.value = downloadLink.href;
-                textArea.style.position = 'fixed';
-                textArea.style.opacity = '0';
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-            }
-
-            // Show temporary success feedback
-            const originalText = shareGifBtn.textContent;
-            shareGifBtn.textContent = 'Link Copied!';
-            shareGifBtn.style.backgroundColor = '#4CAF50';
-            setTimeout(() => {
-                shareGifBtn.textContent = originalText;
-                shareGifBtn.style.backgroundColor = '';
-            }, 2000);
-        } catch (error) {
-            console.error('Failed to copy GIF link:', error);
-            // Show the URL so user can copy manually
-            alert('Copy this link manually: ' + downloadLink.href);
-        }
-    }
-
-    // Copy video link to clipboard for sharing (with iOS compatibility)
-    async function copyVideoLink() {
-        if (!downloadVideo.href) return;
-
-        // Check if this is iOS and show warning about blob URL limitations
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        if (isIOS) {
-            alert('Note: Blob URLs only work while this page is open. For permanent sharing, consider downloading the video and uploading it directly to Facebook.');
-        }
-
-        try {
-            // Try modern clipboard API first
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(downloadVideo.href);
-            } else {
-                // Fallback for older browsers/iOS
-                const textArea = document.createElement('textarea');
-                textArea.value = downloadVideo.href;
-                textArea.style.position = 'fixed';
-                textArea.style.opacity = '0';
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-            }
-
-            // Show temporary success feedback
-            const originalText = shareVideoBtn.textContent;
-            shareVideoBtn.textContent = 'Link Copied!';
-            shareVideoBtn.style.backgroundColor = '#4CAF50';
-            setTimeout(() => {
-                shareVideoBtn.textContent = originalText;
-                shareVideoBtn.style.backgroundColor = '';
-            }, 2000);
-        } catch (error) {
-            console.error('Failed to copy video link:', error);
-            // Show the URL so user can copy manually
-            alert('Copy this link manually: ' + downloadVideo.href);
-        }
-    }
     function waitForImages() {
         const images = [medal, swimmer];
         const loading = images
@@ -195,8 +56,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }));
         return Promise.all(loading);
     }
-    
-    // Function to export a WebM video using MediaRecorder with pause frames at the end
     async function exportProgressVideo() {
         let completedYards = parseInt(completedYardsInput.value) || 0;
         completedYards = Math.max(0, Math.min(GOAL_YARDS, completedYards));
@@ -254,17 +113,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 ctx.restore();
             }
 
-            // Record the canvas
-            const stream = offscreen.captureStream(fps);
-            const mimeCandidates = [
-                'video/webm;codecs=vp9',
-                'video/webm;codecs=vp8',
-                'video/webm'
+            // Record the canvas - use MP4 format
+            const mp4Candidates = [
+                'video/mp4;codecs=h264',
+                'video/mp4;codecs=avc1',
+                'video/mp4'
             ];
+
             let mimeType = '';
-            for (const m of mimeCandidates) {
-                if (MediaRecorder.isTypeSupported(m)) { mimeType = m; break; }
+            for (const m of mp4Candidates) {
+                if (MediaRecorder.isTypeSupported(m)) {
+                    mimeType = m;
+                    break;
+                }
             }
+
+            if (!mimeType) {
+                throw new Error('No supported MP4 format found');
+            }
+
             const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
             const chunks = [];
             recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
@@ -293,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
             recorder.stop();
             await recordingDone;
 
-            const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+            const blob = new Blob(chunks, { type: mimeType || 'video/mp4' });
             const url = URL.createObjectURL(blob);
 
             // Preview video element
@@ -305,34 +172,17 @@ document.addEventListener('DOMContentLoaded', function() {
             gifOutput.innerHTML = '';
             gifOutput.appendChild(videoEl);
 
-            // For iOS, create a more permanent data URL instead of blob URL
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-            if (isIOS) {
-                // Convert blob to data URL for iOS compatibility
-                const reader = new FileReader();
-                reader.onload = function() {
-                    const dataUrl = reader.result;
-                    downloadVideo.href = dataUrl;
-                    downloadVideo.download = `swim-progress-${completedYards}-of-${GOAL_YARDS}yds.webm`;
-                    downloadVideo.style.display = 'inline-block';
-                };
-                reader.readAsDataURL(blob);
-            } else {
-                // Use blob URL for other platforms
-                downloadVideo.href = url;
-                downloadVideo.download = `swim-progress-${completedYards}-of-${GOAL_YARDS}yds.webm`;
-                downloadVideo.style.display = 'inline-block';
-            }
-
-            // Show share button
-            shareVideoBtn.style.display = 'inline-block';
+            // Simple download setup
+            downloadVideo.href = url;
+            downloadVideo.download = `swim-progress-${completedYards}-of-${GOAL_YARDS}yds.mp4`;
+            downloadVideo.style.display = 'inline-block';
 
         } catch (err) {
             console.error('Error exporting video:', err);
             gifOutput.innerHTML = '<p style="color: red;">Could not export video in this environment.</p>';
         } finally {
             exportVideoBtn.disabled = false;
-            exportVideoBtn.textContent = originalBtnText || 'Export Video (WebM)';
+            exportVideoBtn.textContent = originalBtnText || 'Export Video (MP4)';
         }
     }
 
@@ -615,7 +465,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 generateBtn.disabled = false;
                 generateBtn.textContent = 'Generate Progress GIF';
-                // Cleanup worker blob URL
                 try { URL.revokeObjectURL(gif.options.workerScript); } catch (_) {}
             });
 
