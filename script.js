@@ -611,7 +611,11 @@ document.addEventListener('DOMContentLoaded', function() {
             generateBtn.textContent = 'Generate Progress GIF';
         }
     }
-    
+
+    // Initialize after images load so measurements are correct
+    waitForImages().then(() => {
+        const startYards = Math.max(0, Math.min(GOAL_YARDS, parseInt(completedYardsInput.value) || 0));
+        updateProgress(startYards, GOAL_YARDS);
     // Initialize after images load so measurements are correct
     waitForImages().then(() => {
         const startYards = Math.max(0, Math.min(GOAL_YARDS, parseInt(completedYardsInput.value) || 0));
