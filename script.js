@@ -26,6 +26,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Overlay elements for percentage (bottom-right) and yards (bottom-left)
     let overlayPctEl, overlayYardsEl;
     
+    // Fixed, natural medal dimensions to ensure correct aspect
+    const MEDAL_NATURAL_W = 483;
+    const MEDAL_NATURAL_H = 586;
+    
     // Fixed goal yards
     targetYardsSpan.textContent = GOAL_YARDS;
     
