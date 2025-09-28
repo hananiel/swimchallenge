@@ -93,6 +93,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Other browsers - trigger normal download
             downloadVideo.click();
         }
+    }
+
     // Copy link to clipboard for sharing (with iOS compatibility)
     async function copyGifLink() {
         if (!downloadLink.href) return;
@@ -595,11 +597,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             // Render GIF
-            try {
-                gif.render();
-            } catch (secErr) {
-                throw secErr;
-            }
+            gif.render();
 
         } catch (error) {
             console.error('Error generating GIF:', error);
