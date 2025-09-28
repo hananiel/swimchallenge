@@ -61,11 +61,12 @@ document.addEventListener('DOMContentLoaded', function() {
         return Promise.all(loading);
     }
     
-    // Function to export a WebM video using MediaRecorder
+    // Function to export a WebM video using MediaRecorder with pause frames at the end
     async function exportProgressVideo() {
         let completedYards = parseInt(completedYardsInput.value) || 0;
         completedYards = Math.max(0, Math.min(GOAL_YARDS, completedYards));
         const totalFrames = 40; // keep in sync with GIF
+        const pauseFrames = 12; // Additional frames showing the final completed state
         const fps = 20; // 50ms per frame
 
         if (!exportVideoBtn || !downloadVideo) return;
@@ -139,15 +140,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             recorder.start();
 
-            // Draw frames at the desired timing
+            // Draw main animation frames
             for (let i = 0; i <= totalFrames; i++) {
                 const progress = i / totalFrames;
                 const atYards = Math.round(progress * completedYards);
                 drawFrame(atYards);
                 await new Promise(r => setTimeout(r, 1000 / fps));
             }
-            // Pause on last frame for 3 seconds
-            await new Promise(r => setTimeout(r, 3000));
+
+            // Draw pause frames with the final completed state
+            const finalYards = completedYards;
+            for (let i = 0; i < pauseFrames; i++) {
+                drawFrame(finalYards);
+                await new Promise(r => setTimeout(r, 1000 / fps));
+            }
 
             recorder.stop();
             await recordingDone;
