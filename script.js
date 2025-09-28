@@ -15,7 +15,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const shareGifBtn = document.getElementById('shareGifBtn');
     const shareVideoBtn = document.getElementById('shareVideoBtn');
     
-    // Path keyframes provided by user for swimmer center position (x,y) by progress t
+    // Fixed, natural medal dimensions to ensure correct GIF aspect (provided)
+    const MEDAL_NATURAL_W = 483;
+    const MEDAL_NATURAL_H = 586;
+    
+    // Runtime-selected chroma key for GIF transparency handling
+    let CHROMA_KEY = null; // { css: '#ff00ff', int: 0xff00ff }
     const PATH_KEYFRAMES = [
         { t: 0.00, x: 102, y: 345 },
         { t: 0.25, x: 167, y: 352 },
