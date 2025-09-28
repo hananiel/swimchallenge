@@ -136,6 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('No supported MP4 format found');
             }
 
+            const stream = offscreen.captureStream(fps);
             const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
             const chunks = [];
             recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
