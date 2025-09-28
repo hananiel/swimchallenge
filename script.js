@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Copy video link button click handler
     if (shareVideoBtn) shareVideoBtn.addEventListener('click', copyVideoLink);
 
-    // Save to camera roll (iOS optimized)
+    // Save to camera roll (iOS optimized) or download for other platforms
     function saveGifToCameraRoll() {
         if (!downloadLink.href) return;
 
@@ -65,7 +65,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
         if (isIOS && isSafari) {
-            // iOS Safari - use download attribute which offers camera roll saving
+            // iOS Safari - update button text and use download attribute
+            downloadLink.textContent = 'Save GIF to Camera Roll';
             const link = document.createElement('a');
             link.href = downloadLink.href;
             link.download = downloadLink.download;
@@ -74,7 +75,8 @@ document.addEventListener('DOMContentLoaded', function() {
             link.click();
             document.body.removeChild(link);
         } else {
-            // Other browsers - trigger normal download
+            // Other platforms - update button text and trigger download
+            downloadLink.textContent = 'Download GIF';
             downloadLink.click();
         }
     }
@@ -86,7 +88,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
         if (isIOS && isSafari) {
-            // iOS Safari - use download attribute which offers camera roll saving
+            // iOS Safari - update button text and use download attribute
+            downloadVideo.textContent = 'Save Video to Camera Roll';
             const link = document.createElement('a');
             link.href = downloadVideo.href;
             link.download = downloadVideo.download;
@@ -95,7 +98,8 @@ document.addEventListener('DOMContentLoaded', function() {
             link.click();
             document.body.removeChild(link);
         } else {
-            // Other browsers - trigger normal download
+            // Other platforms - update button text and trigger download
+            downloadVideo.textContent = 'Download Video';
             downloadVideo.click();
         }
     }
@@ -301,10 +305,24 @@ document.addEventListener('DOMContentLoaded', function() {
             gifOutput.innerHTML = '';
             gifOutput.appendChild(videoEl);
 
-            // Download link
-            downloadVideo.href = url;
-            downloadVideo.download = `swim-progress-${completedYards}-of-${GOAL_YARDS}yds.webm`;
-            downloadVideo.style.display = 'inline-block';
+            // For iOS, create a more permanent data URL instead of blob URL
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            if (isIOS) {
+                // Convert blob to data URL for iOS compatibility
+                const reader = new FileReader();
+                reader.onload = function() {
+                    const dataUrl = reader.result;
+                    downloadVideo.href = dataUrl;
+                    downloadVideo.download = `swim-progress-${completedYards}-of-${GOAL_YARDS}yds.webm`;
+                    downloadVideo.style.display = 'inline-block';
+                };
+                reader.readAsDataURL(blob);
+            } else {
+                // Use blob URL for other platforms
+                downloadVideo.href = url;
+                downloadVideo.download = `swim-progress-${completedYards}-of-${GOAL_YARDS}yds.webm`;
+                downloadVideo.style.display = 'inline-block';
+            }
 
             // Show share button
             shareVideoBtn.style.display = 'inline-block';
