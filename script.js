@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const downloadLink = document.getElementById('downloadGif');
     const exportVideoBtn = document.getElementById('exportVideoBtn');
     const downloadVideo = document.getElementById('downloadVideo');
+    const shareGifBtn = document.getElementById('shareGifBtn');
+    const shareVideoBtn = document.getElementById('shareVideoBtn');
     
     // Fixed, natural medal dimensions to ensure correct GIF aspect (provided)
     const MEDAL_NATURAL_W = 483;
@@ -48,8 +50,128 @@ document.addEventListener('DOMContentLoaded', function() {
     generateBtn.addEventListener('click', generateProgressGif);
     // Export video button click handler
     if (exportVideoBtn) exportVideoBtn.addEventListener('click', exportProgressVideo);
+    // Share GIF button click handler
+    if (shareGifBtn) shareGifBtn.addEventListener('click', shareGifToFacebook);
+    // Share video button click handler
+    if (shareVideoBtn) shareVideoBtn.addEventListener('click', shareVideoToFacebook);
 
-    // Ensure images are loaded before we measure sizes/positions
+    // Initialize Facebook SDK for sharing
+    function initFacebookSDK() {
+        return new Promise((resolve, reject) => {
+            // Check if already initialized
+            if (window.FB) {
+                resolve();
+                return;
+            }
+
+            // Load Facebook SDK
+            const script = document.createElement('script');
+            script.src = 'https://connect.facebook.net/en_US/sdk.js';
+            script.async = true;
+            script.defer = true;
+            script.onload = () => {
+                window.fbAsyncInit = function() {
+                    FB.init({
+                        appId: null, // No app ID needed for basic sharing
+                        version: 'v18.0'
+                    });
+                    resolve();
+                };
+            };
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    // Share file using Web Share API or fallback to Facebook
+    async function shareToFacebook(file, filename, customMessage = '') {
+        const defaultMessage = `Check out my swim progress! 🏊‍♀️ I've completed ${filename.includes('of-') ? filename.split('of-')[0].split('-')[2] : 'some'} yards toward my goal!`;
+
+        // Try Web Share API first (works on mobile and modern browsers)
+        if (navigator.share && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    title: 'My Swim Progress',
+                    text: customMessage || defaultMessage,
+                    files: [file]
+                });
+                return true;
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.log('Web Share API failed:', err);
+                }
+            }
+        }
+
+        // Fallback to Facebook Share Dialog
+        try {
+            await initFacebookSDK();
+
+            // Create object URL for the file
+            const fileUrl = URL.createObjectURL(file);
+
+            // Use Facebook UI dialog for sharing
+            FB.ui({
+                method: 'share',
+                href: fileUrl,
+                quote: customMessage || defaultMessage,
+            }, function(response) {
+                // Clean up the object URL
+                URL.revokeObjectURL(fileUrl);
+
+                if (response && !response.error_code) {
+                    console.log('Shared to Facebook successfully');
+                } else {
+                    console.log('Facebook sharing cancelled or failed');
+                }
+            });
+
+            return true;
+        } catch (error) {
+            console.error('Facebook sharing failed:', error);
+            return false;
+        }
+    }
+
+    // Share GIF to Facebook
+    async function shareGifToFacebook() {
+        if (!downloadLink.href) return;
+
+        try {
+            // Fetch the blob from the object URL
+            const response = await fetch(downloadLink.href);
+            const blob = await response.blob();
+            const file = new File([blob], downloadLink.download, { type: 'image/gif' });
+
+            const yardsCompleted = completedYardsInput.value || '0';
+            const customMessage = `Just tracked my swim progress - ${yardsCompleted} yards completed! 🏊‍♀️ Who's joining me in the pool?`;
+
+            await shareToFacebook(file, downloadLink.download, customMessage);
+        } catch (error) {
+            console.error('Error sharing GIF:', error);
+            alert('Failed to share GIF. You can still download it and share manually.');
+        }
+    }
+
+    // Share video to Facebook
+    async function shareVideoToFacebook() {
+        if (!downloadVideo.href) return;
+
+        try {
+            // Fetch the blob from the object URL
+            const response = await fetch(downloadVideo.href);
+            const blob = await response.blob();
+            const file = new File([blob], downloadVideo.download, { type: 'video/webm' });
+
+            const yardsCompleted = completedYardsInput.value || '0';
+            const customMessage = `Swim progress update! 🎉 Just completed ${yardsCompleted} yards - feeling accomplished! Who's up for a swim session?`;
+
+            await shareToFacebook(file, downloadVideo.download, customMessage);
+        } catch (error) {
+            console.error('Error sharing video:', error);
+            alert('Failed to share video. You can still download it and share manually.');
+        }
+    }
     function waitForImages() {
         const images = [medal, swimmer];
         const loading = images
@@ -174,6 +296,9 @@ document.addEventListener('DOMContentLoaded', function() {
             downloadVideo.href = url;
             downloadVideo.download = `swim-progress-${completedYards}-of-${GOAL_YARDS}yds.webm`;
             downloadVideo.style.display = 'inline-block';
+
+            // Show share button
+            shareVideoBtn.style.display = 'inline-block';
 
         } catch (err) {
             console.error('Error exporting video:', err);
@@ -457,6 +582,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 downloadLink.href = gifUrl;
                 downloadLink.download = `swim-progress-${completedYards}-of-${GOAL_YARDS}yds.gif`;
                 downloadLink.style.display = 'inline-block';
+
+                // Show share button
+                shareGifBtn.style.display = 'inline-block';
 
                 generateBtn.disabled = false;
                 generateBtn.textContent = 'Generate Progress GIF';
