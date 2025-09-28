@@ -45,10 +45,6 @@ document.addEventListener('DOMContentLoaded', function() {
     generateBtn.addEventListener('click', generateProgressGif);
     // Export video button click handler
     if (exportVideoBtn) exportVideoBtn.addEventListener('click', exportProgressVideo);
-    // Save GIF to default location
-    if (downloadLink) downloadLink.addEventListener('click', () => downloadLink.click());
-    // Save video to default location
-    if (downloadVideo) downloadVideo.addEventListener('click', () => downloadVideo.click());
 
     function waitForImages() {
         const images = [medal, swimmer];
