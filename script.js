@@ -46,6 +46,31 @@ document.addEventListener('DOMContentLoaded', function() {
     // Export video button click handler
     if (exportVideoBtn) exportVideoBtn.addEventListener('click', exportProgressVideo);
 
+    // Download button click handlers
+    if (downloadLink) {
+        downloadLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (downloadLink.href) {
+                const link = document.createElement('a');
+                link.href = downloadLink.href;
+                link.download = downloadLink.download;
+                link.click();
+            }
+        });
+    }
+
+    if (downloadVideo) {
+        downloadVideo.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (downloadVideo.href) {
+                const link = document.createElement('a');
+                link.href = downloadVideo.href;
+                link.download = downloadVideo.download;
+                link.click();
+            }
+        });
+    }
+
     function waitForImages() {
         const images = [medal, swimmer];
         const loading = images
